@@ -36,6 +36,7 @@ run_command mkdir -p $APP_DIR
 
 cat > $APP_DIR/app.py <<EOL
 from flask import Flask, request, make_response
+import os
 import uuid
 import time
 import random
@@ -61,10 +62,11 @@ app.json_encoder = CustomJSONEncoder
 
 
 DB_CONFIG = {
-    'user': 'admin',
-    'password': 'admin1234',
-    'host': '${MYSQL_HOST}',
-    'database': 'shopdb',
+    'user': os.getenv('MYSQL_USER', 'app'),
+    'password': os.getenv('MYSQL_PASSWORD', 'apppw'),
+    'host': os.getenv('MYSQL_HOST', 'mysql'),
+    'port': int(os.getenv('MYSQL_PORT', '3306')),
+    'database': os.getenv('MYSQL_DATABASE', 'shopdb'),
     'ssl_disabled': True
     
 }
@@ -93,6 +95,52 @@ def update_last_active():
 def get_db_connection():
     return mysql.connector.connect(**DB_CONFIG)
     
+@app.route('/health')
+def health():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+@app.after_request
+def log_api_event(response):
+    if request.path == '/health':
+        return response
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO api_events (method, path, status_code, user_id, session_id)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                request.method,
+                request.path,
+                response.status_code,
+                request.cookies.get('user_id') or request.headers.get('X-User-Id'),
+                request.cookies.get('session_id')
+            )
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to log api_event: {e}")
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+    return response
+
 
 
 def respond_html_or_json(data, html_renderer):

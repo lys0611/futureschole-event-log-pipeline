@@ -7,7 +7,12 @@ export CREDENTIAL_ID="{액세스 키 ID}"
 export CREDENTIAL_SECRET="{보안 액세스 키}"
 
 # 데이터베이스 설정
-export MYSQL_HOST="{MySQL 엔드포인트}"
+# Docker Compose 기본 경로에서는 별도 api-server VM 대신 mysql 서비스명을 사용합니다.
+export MYSQL_HOST="${MYSQL_HOST:-mysql}"
+export MYSQL_PORT="${MYSQL_PORT:-3306}"
+export MYSQL_USER="${MYSQL_USER:-app}"
+export MYSQL_PASSWORD="${MYSQL_PASSWORD:-apppw}"
+export MYSQL_DATABASE="${MYSQL_DATABASE:-shopdb}"
 
 # 스키마 레지스트리 설정
 export SCHEMA_REGISTRY_URL="{data-stream-vm의 Private IP}"

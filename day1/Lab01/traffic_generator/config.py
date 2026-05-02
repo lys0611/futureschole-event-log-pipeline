@@ -20,6 +20,16 @@ config_path = os.path.join(current_dir, "config.yml")
 with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
+def _config_value(path, default=None):
+    value = config
+    for key in path:
+        value = value.get(key, {}) if isinstance(value, dict) else {}
+    if isinstance(value, str) and value.startswith("$"):
+        return os.getenv(value[1:].strip("{}"), default)
+    if value in (None, ""):
+        return default
+    return value
+
 # Pub/Sub 설정
 PUBSUB_ENDPOINT = config['pubsub']['endpoint']
 DOMAIN_ID = config['pubsub']['domain_id']
@@ -44,8 +54,8 @@ MAX_CHANNEL_COUNT = config['object_storage_subscription']['max_channel_count']
 IS_EXPORT_ENABLED = config['object_storage_subscription']['is_export_enabled']
 
 # 로그 설정
-LOG_FILENAME = config['logging']['filename']
-LOG_LEVEL = config['logging']['level']
+LOG_FILENAME = os.getenv("LOG_FILENAME", config['logging']['filename'])
+LOG_LEVEL = os.getenv("LOG_LEVEL", config['logging']['level'])
 
 # 스레드 및 사용자 설정
 NUM_USERS = config['threads']['num_users']
@@ -53,9 +63,10 @@ MAX_THREADS = config['threads']['max_threads']
 ACTIONS_PER_USER = config['threads']['actions_per_user']
 
 # API 서버 정보
-API_BASE_URL = config['api']['base_url']
+API_BASE_URL = os.getenv("API_BASE_URL") or _config_value(["api", "base_url"], "api-server:8080")
 API_URL_WITH_HTTP = f"http://{API_BASE_URL}/"
 API_ENDPOINTS = {k.upper(): v for k, v in config['api']['endpoints'].items()}
+REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", config['api'].get('request_timeout_sec', 5)))
 
 # 요청 간 대기 시간 범위 (초)
 TIME_SLEEP_RANGE = (config['api']['time_sleep_range']['min'], config['api']['time_sleep_range']['max'])

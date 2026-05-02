@@ -11,6 +11,10 @@ set -o pipefail
 echo "kakaocloud: 3. 환경 변수를 ~/.bashrc에 추가"
 BASHRC_EXPORT=$(cat <<EOF
 export MYSQL_HOST="$MYSQL_HOST"
+export MYSQL_PORT="${MYSQL_PORT:-3306}"
+export MYSQL_USER="${MYSQL_USER:-app}"
+export MYSQL_PASSWORD="${MYSQL_PASSWORD:-apppw}"
+export MYSQL_DATABASE="${MYSQL_DATABASE:-shopdb}"
 export DOMAIN_ID="$DOMAIN_ID"
 export PROJECT_ID="$PROJECT_ID"
 export PUBSUB_TOPIC_NAME="$PUBSUB_TOPIC_NAME"
@@ -95,6 +99,10 @@ if [ -f "$SERVICE_FILE" ]; then
     || { echo "kakaocloud: flask_app.service env 파일 작성 실패"; exit 1; }
 [Service]
 Environment="MYSQL_HOST=$MYSQL_HOST"
+Environment="MYSQL_PORT=${MYSQL_PORT:-3306}"
+Environment="MYSQL_USER=${MYSQL_USER:-app}"
+Environment="MYSQL_PASSWORD=${MYSQL_PASSWORD:-apppw}"
+Environment="MYSQL_DATABASE=${MYSQL_DATABASE:-shopdb}"
 Environment="DOMAIN_ID=$DOMAIN_ID"
 Environment="PROJECT_ID=$PROJECT_ID"
 Environment="PUBSUB_TOPIC_NAME=$PUBSUB_TOPIC_NAME"

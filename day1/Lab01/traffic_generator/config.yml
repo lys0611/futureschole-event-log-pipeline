@@ -31,7 +31,8 @@ threads:
   actions_per_user: 30
 
 api:
-  base_url: "$API_BASE_URL"
+  base_url: "api-server:8080"
+  request_timeout_sec: 5
   endpoints:
     add_user: "add_user"
     delete_user: "delete_user"

@@ -9,6 +9,7 @@ GOSDK_DIR="/home/ubuntu/gosdk"
 CONFIG_DIR="/home/ubuntu/DataAnalyzeCourse/src/day1/Lab01/traffic_generator"
 GOPATH_VAL="/home/ubuntu/go"
 GOCACHE_VAL="/home/ubuntu/.cache/go-build"
+API_BASE_URL="${API_BASE_URL:-api-server:8080}"
 
 # === 스크립트 시작 ===
 echo "kakaocloud: 3. 필수 환경변수 검증 시작"
@@ -74,6 +75,7 @@ threads:
 
 api:
   base_url: "$API_BASE_URL"
+  request_timeout_sec: 5
   endpoints:
     add_user: "add_user"
     delete_user: "delete_user"

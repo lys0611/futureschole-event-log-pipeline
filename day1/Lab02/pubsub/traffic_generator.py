@@ -46,6 +46,11 @@ def parse_args():
                         help='한번 실행(once) vs 지속 실행(continuous)')
     return parser.parse_args()
 
+class TimeoutSession(requests.Session):
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", config.REQUEST_TIMEOUT)
+        return super().request(method, url, **kwargs)
+
 #################################
 # 나이 구간 판단 함수
 #################################
@@ -87,7 +92,7 @@ def fetch_products(api_base_url: str):
     headers = {"Accept": "application/json"}
     try:
         url = config.API_URL_WITH_HTTP + config.API_ENDPOINTS["PRODUCTS"]
-        resp = requests.get(url, headers=headers)
+        resp = requests.get(url, headers=headers, timeout=config.REQUEST_TIMEOUT)
         if resp.status_code == 200:
             data = resp.json()
             if isinstance(data, list):
@@ -113,7 +118,7 @@ def fetch_categories(api_base_url: str):
     headers = {"Accept": "application/json"}
     try:
         url = config.API_URL_WITH_HTTP + config.API_ENDPOINTS["CATEGORIES"]
-        resp = requests.get(url, headers=headers)
+        resp = requests.get(url, headers=headers, timeout=config.REQUEST_TIMEOUT)
         if resp.status_code == 200:
             data = resp.json()
             if isinstance(data, list):
@@ -744,7 +749,7 @@ def do_top_level_action_and_confirm(
 # 사용자 전체 로직
 #################################
 def run_user_simulation(user_idx: int):
-    session = requests.Session()
+    session = TimeoutSession()
     session.prev_url = None
     session.get(config.API_URL_WITH_HTTP)
 
