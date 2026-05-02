@@ -1,0 +1,53 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: shopdb
+      MYSQL_USER: app
+      MYSQL_PASSWORD: apppw
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uapp -papppw --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  api-server:
+    build:
+      context: .
+      dockerfile: api_server/Dockerfile
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: app
+      MYSQL_PASSWORD: apppw
+      MYSQL_DATABASE: shopdb
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  traffic-generator:
+    build:
+      context: ..
+      dockerfile: Lab01/traffic_generator/Dockerfile
+    environment:
+      API_BASE_URL: api-server:8080
+      LOG_FILENAME: /dev/stdout
+      REQUEST_TIMEOUT: 5
+    depends_on:
+      api-server:
+        condition: service_healthy
+    command: ["python", "traffic_generator.py", "--mode", "continuous"]
+
+volumes:
+  mysql-data:
