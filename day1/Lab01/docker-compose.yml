@@ -2,15 +2,19 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpw
-      MYSQL_DATABASE: shopdb
-      MYSQL_USER: app
-      MYSQL_PASSWORD: apppw
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shopdb}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppw}
+      DEBEZIUM_USER: ${DEBEZIUM_USER:-debezium}
+      DEBEZIUM_PASSWORD: ${DEBEZIUM_PASSWORD:-dbzpw}
     volumes:
       - mysql-data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db/02-debezium-user.sh:/docker-entrypoint-initdb.d/02-debezium-user.sh:ro
+      - ./mysql/conf.d/cdc.cnf:/etc/mysql/conf.d/cdc.cnf:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uapp -papppw --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -22,9 +26,9 @@ services:
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_USER: app
-      MYSQL_PASSWORD: apppw
-      MYSQL_DATABASE: shopdb
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shopdb}
     ports:
       - "8080:8080"
     depends_on:
@@ -48,6 +52,114 @@ services:
       api-server:
         condition: service_healthy
     command: ["python", "traffic_generator.py", "--mode", "continuous"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.3
+    profiles: ["stream"]
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.3
+    profiles: ["stream"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-connect:
+    build:
+      context: .
+      dockerfile: kafka_connect/Dockerfile
+    profiles: ["stream"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: compose-connect-cluster
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      DEBEZIUM_USER: ${DEBEZIUM_USER:-debezium}
+      DEBEZIUM_PASSWORD: ${DEBEZIUM_PASSWORD:-dbzpw}
+      BUCKET_NAME: ${BUCKET_NAME:-}
+      AWS_ACCESS_KEY_ID_VALUE: ${AWS_ACCESS_KEY_ID_VALUE:-}
+      AWS_SECRET_ACCESS_KEY_VALUE: ${AWS_SECRET_ACCESS_KEY_VALUE:-}
+      AWS_DEFAULT_REGION_VALUE: ${AWS_DEFAULT_REGION_VALUE:-}
+      AWS_DEFAULT_OUTPUT_VALUE: ${AWS_DEFAULT_OUTPUT_VALUE:-}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+      STORE_URL: ${STORE_URL:-}
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connectors >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  connector-init:
+    image: curlimages/curl:8.10.1
+    profiles: ["stream"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_healthy
+    environment:
+      CONNECT_URL: http://kafka-connect:8083
+      BUCKET_NAME: ${BUCKET_NAME:-}
+      AWS_ACCESS_KEY_ID_VALUE: ${AWS_ACCESS_KEY_ID_VALUE:-}
+      AWS_SECRET_ACCESS_KEY_VALUE: ${AWS_SECRET_ACCESS_KEY_VALUE:-}
+      AWS_DEFAULT_REGION_VALUE: ${AWS_DEFAULT_REGION_VALUE:-}
+      AWS_DEFAULT_OUTPUT_VALUE: ${AWS_DEFAULT_OUTPUT_VALUE:-}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+      STORE_URL: ${STORE_URL:-}
+    volumes:
+      - ./kafka_connect/connectors:/connectors:ro
+      - ./kafka_connect/register-connectors.sh:/register-connectors.sh:ro
+    entrypoint: ["/bin/sh", "/register-connectors.sh"]
 
 volumes:
   mysql-data:

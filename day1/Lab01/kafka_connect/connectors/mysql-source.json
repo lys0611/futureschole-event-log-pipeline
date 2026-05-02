@@ -1,0 +1,31 @@
+{
+  "name": "mysql-cdc-shopdb",
+  "config": {
+    "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+    "tasks.max": "1",
+    "database.hostname": "mysql",
+    "database.port": "3306",
+    "database.user": "${env:DEBEZIUM_USER}",
+    "database.password": "${env:DEBEZIUM_PASSWORD}",
+    "database.server.id": "184054",
+    "database.server.name": "mysql-server",
+    "topic.prefix": "mysql-server",
+    "database.include.list": "shopdb",
+    "table.include.list": "shopdb.api_events,shopdb.cart,shopdb.cart_logs,shopdb.orders,shopdb.products,shopdb.push_messages,shopdb.reviews,shopdb.search_logs,shopdb.sessions,shopdb.users,shopdb.users_logs",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.shopdb",
+    "topic.creation.enable": "true",
+    "topic.creation.default.partitions": "2",
+    "topic.creation.default.replication.factor": "1",
+    "tombstones.on.delete": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "decimal.handling.mode": "string",
+    "snapshot.mode": "initial",
+    "include.schema.changes": "false",
+    "database.allowPublicKeyRetrieval": "true",
+    "database.ssl.mode": "disabled"
+  }
+}

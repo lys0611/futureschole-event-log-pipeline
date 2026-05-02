@@ -1,0 +1,29 @@
+{
+  "name": "mysql-s3-sink-connector",
+  "config": {
+    "connector.class": "io.confluent.connect.s3.S3SinkConnector",
+    "tasks.max": "1",
+    "topics": "mysql-server.shopdb.api_events,mysql-server.shopdb.cart,mysql-server.shopdb.cart_logs,mysql-server.shopdb.orders,mysql-server.shopdb.products,mysql-server.shopdb.push_messages,mysql-server.shopdb.reviews,mysql-server.shopdb.search_logs,mysql-server.shopdb.sessions,mysql-server.shopdb.users,mysql-server.shopdb.users_logs",
+    "s3.region": "${env:AWS_DEFAULT_REGION_VALUE}",
+    "s3.bucket.name": "${env:BUCKET_NAME}",
+    "s3.part.size": "5242880",
+    "aws.access.key.id": "${env:AWS_ACCESS_KEY_ID_VALUE}",
+    "aws.secret.access.key": "${env:AWS_SECRET_ACCESS_KEY_VALUE}",
+    "store.url": "${env:OBJECT_STORAGE_ENDPOINT}",
+    "storage.class": "io.confluent.connect.s3.storage.S3Storage",
+    "format.class": "io.confluent.connect.s3.format.json.JsonFormat",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "flush.size": "500",
+    "rotate.schedule.interval.ms": "5000",
+    "timestamp.extractor": "RecordField",
+    "timestamp.field": "ts_ms",
+    "topics.dir": "raw_cdc_events",
+    "path.format": "shopdb/${topic}/year=yyyy/month=MM/day=dd/hour=HH",
+    "locale": "en-US",
+    "timezone": "Asia/Seoul",
+    "behavior.on.null.values": "ignore"
+  }
+}
